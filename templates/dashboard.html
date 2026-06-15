@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>AI-IDS Security Operations Center</title>
+    <!-- Load Plotly CDN once at the head -->
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js" charset="utf-8"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>AI-Enhanced Intrusion Detection System</h1>
+                <p>Real-time machine learning network traffic monitoring and threat classification</p>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <a href="/alerts-page" class="scan-btn" style="text-decoration: none; background: rgba(31, 41, 55, 0.4); border: 1px solid var(--border-card);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                    View Alerts Database
+                </a>
+                <div class="status-badge" id="system-status">
+                    <div class="status-dot"></div>
+                    <span>SYSTEM ONLINE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Security Overview Metric Grid -->
+        <section class="overview-grid">
+            <div class="card scanned-card">
+                <div>
+                    <div class="card-title">Total Traffic Scanned</div>
+                    <div class="card-value" id="stat-total-scanned">0</div>
+                </div>
+            </div>
+            <div class="card threats-card">
+                <div>
+                    <div class="card-title">Total Threats</div>
+                    <div class="card-value" id="stat-threats" style="color: var(--color-danger);">0</div>
+                </div>
+            </div>
+            <div class="card safe-card">
+                <div>
+                    <div class="card-title">Safe Connections</div>
+                    <div class="card-value" id="stat-safe" style="color: var(--color-success);">0</div>
+                </div>
+            </div>
+            <div class="card accuracy-card">
+                <div>
+                    <div class="card-title">Model Accuracy</div>
+                    <div class="card-value" id="stat-accuracy" style="color: var(--color-warning);">0%</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Middle Section: Active Traffic Inspector & Custom Threat Breakdown -->
+        <section class="content-section">
+            <!-- Left panel: Live scanner console -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Active Traffic Inspector</h2>
+                    <button class="scan-btn" id="scan-btn" onclick="triggerScan()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m16.2 8.6-8.4 8.4"></path><path d="M12 8v4"></path><path d="M12 16h.01"></path></svg>
+                        Scan Network Traffic
+                    </button>
+                </div>
+                <div class="scan-feed" id="scan-feed">
+                    <div class="feed-line" style="color: var(--text-secondary);">Console ready. Click "Scan Network Traffic" to inspect active packet flows...</div>
+                </div>
+            </div>
+
+            <!-- Right panel: Quick Bar Breakdown -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Quick Threat Metrics</h2>
+                </div>
+                <div class="bar-chart-custom">
+                    <div class="bar-row">
+                        <div class="bar-label">Benign</div>
+                        <div class="bar-track">
+                            <div class="bar-fill benign" id="fill-benign"></div>
+                        </div>
+                        <div class="bar-value" id="val-benign">0</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">DDoS Attack</div>
+                        <div class="bar-track">
+                            <div class="bar-fill ddos" id="fill-ddos"></div>
+                        </div>
+                        <div class="bar-value" id="val-ddos">0</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Port Scan</div>
+                        <div class="bar-track">
+                            <div class="bar-fill port" id="fill-port"></div>
+                        </div>
+                        <div class="bar-value" id="val-port">0</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Botnet</div>
+                        <div class="bar-track">
+                            <div class="bar-fill botnet" id="fill-botnet"></div>
+                        </div>
+                        <div class="bar-value" id="val-botnet">0</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Brute Force</div>
+                        <div class="bar-track">
+                            <div class="bar-fill brute" id="fill-brute"></div>
+                        </div>
+                        <div class="bar-value" id="val-brute">0</div>
+                    </div>
+                    <div class="bar-row">
+                        <div class="bar-label">Web Attack</div>
+                        <div class="bar-track">
+                            <div class="bar-fill web" id="fill-web"></div>
+                        </div>
+                        <div class="bar-value" id="val-web">0</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Plotly Charts Panels -->
+        <section class="charts-grid">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Traffic Composition</h2>
+                </div>
+                <div id="plotly-pie-chart" class="chart-container"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Threat Incidence</h2>
+                </div>
+                <div id="plotly-bar-chart" class="chart-container"></div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Threat Trend over Time</h2>
+                </div>
+                <div id="plotly-line-chart" class="chart-container"></div>
+            </div>
+        </section>
+
+        <!-- Bottom Panel: Alert logs table -->
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Recent Security Alerts (Database Logs)</h2>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Severity</th>
+                            <th>Attack Type</th>
+                            <th>Source IP</th>
+                            <th>Destination IP</th>
+                            <th>Confidence</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                                Loading security logs...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Security Alerts Log | AI-IDS</title>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>AI-IDS Security Alerts Log</h1>
+                <p>Comprehensive historical database of detected network intrusion threats</p>
+            </div>
+            <div>
+                <a href="/dashboard" class="scan-btn" style="text-decoration: none;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>
+                    Back to Dashboard
+                </a>
+            </div>
+        </header>
+
+        <!-- Alerts Count Stats -->
+        <section class="overview-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+            <div class="card threats-card" style="padding: 1.25rem;">
+                <div>
+                    <div class="card-title">Total Logged Threats</div>
+                    <div class="card-value" style="font-size: 1.75rem; color: var(--color-danger);">{{ alerts|length }}</div>
+                </div>
+            </div>
+            <div class="card" style="padding: 1.25rem; border-color: rgba(236, 72, 153, 0.2);">
+                <div>
+                    <div class="card-title">Critical Severity</div>
+                    <div class="card-value" style="font-size: 1.75rem; color: var(--color-critical);">
+                        {{ alerts|selectattr("severity", "equalto", "CRITICAL")|list|length }}
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="padding: 1.25rem; border-color: rgba(239, 68, 68, 0.2);">
+                <div>
+                    <div class="card-title">High Severity</div>
+                    <div class="card-value" style="font-size: 1.75rem; color: var(--color-danger);">
+                        {{ alerts|selectattr("severity", "equalto", "HIGH")|list|length }}
+                    </div>
+                </div>
+            </div>
+            <div class="card" style="padding: 1.25rem; border-color: rgba(245, 158, 11, 0.2);">
+                <div>
+                    <div class="card-title">Medium Severity</div>
+                    <div class="card-value" style="font-size: 1.75rem; color: var(--color-warning);">
+                        {{ alerts|selectattr("severity", "equalto", "MEDIUM")|list|length }}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Alerts Table Panel -->
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Historical Security Alerts</h2>
+                <div style="font-size: 0.875rem; color: var(--text-secondary);">Showing {{ alerts|length }} alerts</div>
+            </div>
+            <div class="table-wrapper" style="max-height: 600px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Alert ID</th>
+                            <th>Severity</th>
+                            <th>Attack Type</th>
+                            <th>Source IP</th>
+                            <th>Confidence</th>
+                            <th>Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if alerts %}
+                            {% for alert in alerts %}
+                                <tr>
+                                    <td style="font-family: monospace; color: var(--text-secondary);">#{{ "%05d"|format(alert.id) }}</td>
+                                    <td>
+                                        {% if alert.severity == "CRITICAL" %}
+                                            <span class="badge badge-critical">CRITICAL</span>
+                                        {% elif alert.severity == "HIGH" %}
+                                            <span class="badge badge-high">HIGH</span>
+                                        {% elif alert.severity == "MEDIUM" %}
+                                            <span class="badge badge-medium">MEDIUM</span>
+                                        {% else %}
+                                            <span class="badge badge-benign">LOW</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="font-weight: 600;">{{ alert.attack_type }}</td>
+                                    <td style="font-family: monospace;">{{ alert.source_ip }}</td>
+                                    <td style="font-weight: bold; color: {% if alert.severity == 'CRITICAL' %}var(--color-critical){% else %}var(--color-danger){% endif %};">
+                                        {% if alert.confidence_score <= 1.0 %}
+                                            {{ (alert.confidence_score * 100)|round(1) }}%
+                                        {% else %}
+                                            {{ alert.confidence_score|round(1) }}%
+                                        {% endif %}
+                                    </td>
+                                    <td style="color: var(--text-secondary);">{{ alert.detection_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                                    No alerts logged in the database. Scan traffic to generate logs.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+</body>
+</html>
