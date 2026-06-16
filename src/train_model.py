@@ -6,6 +6,41 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score, precision_recall_fscore_support
 
+def save_metrics_to_db(accuracy: float, precision: float, recall: float, f1: float):
+    """
+    Saves model performance metrics to the database model_metrics table.
+    Ensures path resolutions work when run directly as a script.
+    """
+    try:
+        import sys
+        # Resolve root path of the project to import db
+        root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        if root_dir not in sys.path:
+            sys.path.append(root_dir)
+
+        from db.database import SessionLocal
+        from db.models import ModelMetric
+
+        db = SessionLocal()
+        try:
+            metric_record = ModelMetric(
+                accuracy=accuracy,
+                precision_score=precision,
+                recall_score=recall,
+                f1_score=f1
+            )
+            db.add(metric_record)
+            db.commit()
+            print("Successfully saved training metrics to the database 'model_metrics' table.")
+        except Exception as db_err:
+            db.rollback()
+            print(f"Database error saving metrics: {db_err}")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Could not save metrics to database: {e}")
+
+
 def train_ids_model(input_file, model_output_path):
     # 1. Load the encoded data
     print("Loading encoded data...")
@@ -83,6 +118,10 @@ def train_ids_model(input_file, model_output_path):
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=4)
     print(f"Saved evaluation metrics to: {metrics_path}")
+
+    # Save metrics to the database table model_metrics
+    precision_avg, recall_avg, f1_avg, _ = precision_recall_fscore_support(y_test, y_pred, average='weighted')
+    save_metrics_to_db(float(accuracy), float(precision_avg), float(recall_avg), float(f1_avg))
     
     # 7. Save the model
     if not os.path.exists(models_dir):

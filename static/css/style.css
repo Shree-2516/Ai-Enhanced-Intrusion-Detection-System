@@ -133,6 +133,9 @@ header {
 .card.threats-card::before { background: var(--color-danger); }
 .card.safe-card::before { background: var(--color-success); }
 .card.accuracy-card::before { background: var(--color-warning); }
+.card.precision-card::before { background: var(--color-primary); }
+.card.recall-card::before { background: var(--color-success); }
+.card.f1-card::before { background: var(--color-critical); }
 
 .card-title {
     font-size: 0.875rem;

@@ -11,8 +11,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from db.database import SessionLocal, engine
-from db.models import Alert, Base, TrafficRecord
-from src.severity import get_severity
+from db.models import Alert, Base, TrafficRecord, TrafficLog, ModelMetric
+from src.alert_system import create_alert, assign_severity
 from src.charts import get_charts_data
 
 app = FastAPI(title="AI Enhanced Intrusion Detection System")
@@ -44,6 +44,7 @@ def init_db_data():
     """Pre-populates the database with historical data matching the user's example metrics."""
     db = SessionLocal()
     try:
+        # 1. Populate TrafficRecord and Alert tables if TrafficRecord is empty
         if db.query(TrafficRecord).count() == 0:
             print("Database is empty. Pre-populating with 10,000 historical records...")
             
@@ -73,7 +74,7 @@ def init_db_data():
                 dt = start_time + timedelta(seconds=random.randint(0, 7 * 24 * 3600))
                 
                 # Fetch severity dynamically from severity engine
-                severity = get_severity(attack)
+                severity = assign_severity(attack)
                 
                 records.append({
                     "source_ip": src,
@@ -125,6 +126,69 @@ def init_db_data():
             db.execute(Alert.__table__.insert(), alerts)
             db.commit()
             print("Successfully initialized mock database records!")
+
+        # 2. Populate traffic_logs table if empty
+        if db.query(TrafficLog).count() == 0:
+            print("Pre-populating traffic_logs table...")
+            existing_records = db.query(TrafficRecord).all()
+            if existing_records:
+                traffic_logs_data = [
+                    {
+                        "source_ip": r.source_ip,
+                        "destination_ip": r.destination_ip,
+                        "protocol": r.protocol,
+                        "packet_size": r.packet_length,
+                        "prediction": r.predicted_class,
+                        "created_at": r.timestamp
+                    }
+                    for r in existing_records
+                ]
+                # Chunk insert to avoid potential MySQL packet limits
+                chunk_size = 2000
+                for start_idx in range(0, len(traffic_logs_data), chunk_size):
+                    end_idx = start_idx + chunk_size
+                    db.execute(
+                        TrafficLog.__table__.insert(),
+                        traffic_logs_data[start_idx:end_idx]
+                    )
+                db.commit()
+                print(f"Successfully populated traffic_logs with {len(traffic_logs_data)} records!")
+
+        # 3. Populate model_metrics table if empty
+        if db.query(ModelMetric).count() == 0:
+            print("Pre-populating model_metrics table from local JSON...")
+            metrics_path = BASE_DIR / "models" / "model_metrics.json"
+            if metrics_path.exists():
+                try:
+                    with open(metrics_path, "r", encoding="utf-8") as f:
+                        metrics_data = json.load(f)
+                    
+                    accuracy = metrics_data.get("accuracy", 0.984)
+                    class_metrics = metrics_data.get("class_metrics", {})
+                    
+                    if class_metrics:
+                        precisions = [m.get("precision", 0.0) for m in class_metrics.values()]
+                        recalls = [m.get("recall", 0.0) for m in class_metrics.values()]
+                        f1s = [m.get("f1_score", 0.0) for m in class_metrics.values()]
+                        avg_precision = sum(precisions) / len(precisions)
+                        avg_recall = sum(recalls) / len(recalls)
+                        avg_f1 = sum(f1s) / len(f1s)
+                    else:
+                        avg_precision, avg_recall, avg_f1 = 0.984, 0.984, 0.984
+                    
+                    metric_record = ModelMetric(
+                        accuracy=accuracy,
+                        precision_score=avg_precision,
+                        recall_score=avg_recall,
+                        f1_score=avg_f1
+                    )
+                    db.add(metric_record)
+                    db.commit()
+                    print("Successfully pre-populated model_metrics table!")
+                except Exception as ex:
+                    db.rollback()
+                    print(f"Error loading model metrics into DB: {ex}")
+
     except Exception as e:
         db.rollback()
         print(f"Error pre-populating database: {e}")
@@ -163,16 +227,35 @@ def alerts_page(request: Request):
 def get_dashboard_stats():
     db = SessionLocal()
     try:
-        # Load accuracy from metrics JSON
+        # Load accuracy, precision, recall, f1_score from database model_metrics
         accuracy = 0.984
-        metrics_path = BASE_DIR / "models" / "model_metrics.json"
-        if metrics_path.exists():
-            try:
-                with open(metrics_path, "r", encoding="utf-8") as f:
-                    metrics = json.load(f)
-                    accuracy = metrics.get("accuracy", 0.984)
-            except Exception:
-                pass
+        precision = 0.984
+        recall = 0.984
+        f1_score = 0.984
+
+        latest_metric = db.query(ModelMetric).order_by(ModelMetric.id.desc()).first()
+        if latest_metric:
+            accuracy = latest_metric.accuracy
+            precision = latest_metric.precision_score
+            recall = latest_metric.recall_score
+            f1_score = latest_metric.f1_score
+        else:
+            metrics_path = BASE_DIR / "models" / "model_metrics.json"
+            if metrics_path.exists():
+                try:
+                    with open(metrics_path, "r", encoding="utf-8") as f:
+                        metrics = json.load(f)
+                        accuracy = metrics.get("accuracy", 0.984)
+                        class_metrics = metrics.get("class_metrics", {})
+                        if class_metrics:
+                            precisions = [m.get("precision", 0.984) for m in class_metrics.values()]
+                            recalls = [m.get("recall", 0.984) for m in class_metrics.values()]
+                            f1s = [m.get("f1_score", 0.984) for m in class_metrics.values()]
+                            precision = sum(precisions) / len(precisions)
+                            recall = sum(recalls) / len(recalls)
+                            f1_score = sum(f1s) / len(f1s)
+                except Exception:
+                    pass
                 
         total_scanned = db.query(TrafficRecord).count()
         total_threats = db.query(Alert).count()
@@ -210,7 +293,10 @@ def get_dashboard_stats():
             "total_records": total_scanned,
             "threats": total_threats,
             "safe": safe_connections,
-            "accuracy": round(accuracy * 100, 1),
+            "accuracy": round(accuracy * 100, 1) if accuracy <= 1.0 else round(accuracy, 1),
+            "precision": round(precision * 100, 1) if precision <= 1.0 else round(precision, 1),
+            "recall": round(recall * 100, 1) if recall <= 1.0 else round(recall, 1),
+            "f1_score": round(f1_score * 100, 1) if f1_score <= 1.0 else round(f1_score, 1),
             "threat_distribution": threat_distribution,
             "recent_alerts": alerts_list,
             "charts": charts_data
@@ -294,22 +380,29 @@ def predict():
                 confidence_score=conf
             )
             db.add(tr)
+
+            # Log to TrafficLog (Database Upgrade)
+            tl = TrafficLog(
+                source_ip=src,
+                destination_ip=dst,
+                protocol=protocol,
+                packet_size=pkt_len,
+                prediction=predicted_class
+            )
+            db.add(tl)
             
             # Log Alert if it's an attack
             if is_anomaly == 1:
                 threats_detected += 1
                 
-                # Fetch severity dynamically from severity engine
-                severity = get_severity(predicted_class)
-                
-                alert = Alert(
+                # Create and save alert via the centralized alert system
+                create_alert(
+                    db_session=db,
                     attack_type=predicted_class,
-                    severity=severity,
                     source_ip=src,
                     destination_ip=dst,
                     confidence_score=conf
                 )
-                db.add(alert)
                 
             scanned_records.append({
                 "source_ip": src,

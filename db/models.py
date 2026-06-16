@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, TIMESTAMP
 from sqlalchemy.sql import func
 from .database import Base
 
@@ -39,5 +39,34 @@ class TrafficRecord(Base):
     
     timestamp = Column(
         DateTime(timezone=True),
+        server_default=func.now()
+    )
+
+
+class TrafficLog(Base):
+    __tablename__ = "traffic_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    source_ip = Column(String(50))
+    destination_ip = Column(String(50))
+    protocol = Column(String(20))
+    packet_size = Column(Integer)
+    prediction = Column(String(100))
+    created_at = Column(
+        TIMESTAMP,
+        server_default=func.now()
+    )
+
+
+class ModelMetric(Base):
+    __tablename__ = "model_metrics"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    accuracy = Column(Float)
+    precision_score = Column(Float)
+    recall_score = Column(Float)
+    f1_score = Column(Float)
+    created_at = Column(
+        TIMESTAMP,
         server_default=func.now()
     )

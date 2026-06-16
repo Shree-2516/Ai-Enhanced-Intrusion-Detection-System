@@ -13,6 +13,16 @@ async function fetchStats() {
         document.getElementById('stat-threats').innerText = Number(data.threats).toLocaleString();
         document.getElementById('stat-safe').innerText = Number(data.safe).toLocaleString();
         document.getElementById('stat-accuracy').innerText = data.accuracy + "%";
+        
+        if (document.getElementById('stat-precision')) {
+            document.getElementById('stat-precision').innerText = data.precision + "%";
+        }
+        if (document.getElementById('stat-recall')) {
+            document.getElementById('stat-recall').innerText = data.recall + "%";
+        }
+        if (document.getElementById('stat-f1')) {
+            document.getElementById('stat-f1').innerText = data.f1_score + "%";
+        }
 
         // Update threat distribution chart (custom bar chart)
         updateChart(data.threat_distribution);
