@@ -28,3 +28,7 @@ Thumbs.db
 
 # Models (Optional - if files are too large for GitHub)
 models/*.joblib
+
+# Exclude documentation and demo videos
+docs/
+demo-video.mp4
